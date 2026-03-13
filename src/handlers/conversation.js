@@ -1,6 +1,7 @@
 const db = require('../db/database');
 const { sendMessage } = require('../services/whatsapp');
 const { createTicket, getTicketByNumber, getTicketsByNumber } = require('../services/tickets');
+const { logTicketToSheet } = require('../services/sheets');
 
 const CATEGORIES = {
     '1': 'Computer / Laptop',
@@ -207,6 +208,13 @@ async function handleDescribeFault(whatsappNumber, message, data) {
     };
 
     const ticketNumber = createTicket(ticketData);
+
+    // log to Google Sheets
+    await logTicketToSheet({
+        ...ticketData,
+        ticket_number: ticketNumber
+    });
+    
     resetState(whatsappNumber);
 
     await sendMessage(whatsappNumber,
