@@ -1,5 +1,5 @@
 const db = require('../db/database');
-const { sendMessage } = require('../services/twilio');
+const { sendMessage } = require('../services/whatsapp');
 const { createTicket, getTicketByNumber, getTicketsByNumber } = require('../services/tickets');
 
 const CATEGORIES = {
