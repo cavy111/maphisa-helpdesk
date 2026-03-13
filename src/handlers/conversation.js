@@ -53,6 +53,24 @@ function resetState(whatsappNumber) {
     setState(whatsappNumber, 'main_menu', {});
 }
 
+async function notifyICTTeam(ticketData, ticketNumber) {
+    const staffNumbers = process.env.ICT_STAFF_NUMBERS?.split(',') || [];
+    
+    const notification =
+        `🔔 *New ICT Fault Reported*\n\n` +
+        `🎫 Ticket: *${ticketNumber}*\n` +
+        `👤 Staff: ${ticketData.staff_name}\n` +
+        `🏢 Department: ${ticketData.department}\n` +
+        `🔧 Category: ${ticketData.category}\n` +
+        `📝 Description: ${ticketData.description}\n` +
+        `📊 Status: *Pending*\n` +
+        `🕒 Time: ${new Date().toLocaleString()}`;
+
+    for (const number of staffNumbers) {
+        await sendMessage(number.trim(), notification);
+    }
+}
+
 async function handleMessage(whatsappNumber, message) {
     const input = message.trim().toLowerCase();
     const { step, data } = getState(whatsappNumber);
@@ -215,6 +233,8 @@ async function handleDescribeFault(whatsappNumber, message, data) {
         ticket_number: ticketNumber
     });
     
+    await notifyICTTeam(ticketData, ticketNumber);
+
     resetState(whatsappNumber);
 
     await sendMessage(whatsappNumber,
