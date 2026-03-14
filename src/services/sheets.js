@@ -1,18 +1,25 @@
 const { google } = require('googleapis');
-const path = require('path');
 
-const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+let auth = null;
 
-const auth = new google.auth.GoogleAuth({
-    credentials,
-    scopes: ['https://www.googleapis.com/auth/spreadsheets']
-});
+try {
+    const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+    auth = new google.auth.GoogleAuth({
+        credentials,
+        scopes: ['https://www.googleapis.com/auth/spreadsheets']
+    });
+} catch (err) {
+    console.error('Google Sheets auth failed — GOOGLE_CREDENTIALS may be missing or invalid:', err.message);
+}
 
 async function logTicketToSheet(ticket) {
+    if (!auth) {
+        console.warn('Skipping Google Sheets log — auth not configured');
+        return;
+    }
     try {
         const client = await auth.getClient();
         const sheets = google.sheets({ version: 'v4', auth: client });
-
         await sheets.spreadsheets.values.append({
             spreadsheetId: process.env.GOOGLE_SHEET_ID,
             range: 'Sheet1!A:H',
@@ -30,7 +37,6 @@ async function logTicketToSheet(ticket) {
                 ]]
             }
         });
-
         console.log('Ticket logged to Google Sheets:', ticket.ticket_number);
     } catch (err) {
         console.error('Google Sheets error:', err.message);
@@ -38,34 +44,26 @@ async function logTicketToSheet(ticket) {
 }
 
 async function updateTicketStatus(ticketNumber, status) {
+    if (!auth) {
+        console.warn('Skipping Google Sheets update — auth not configured');
+        return;
+    }
     try {
         const client = await auth.getClient();
         const sheets = google.sheets({ version: 'v4', auth: client });
-
-        // find the row with this ticket number
         const response = await sheets.spreadsheets.values.get({
             spreadsheetId: process.env.GOOGLE_SHEET_ID,
             range: 'Sheet1!A:A'
         });
-
         const rows = response.data.values || [];
         const rowIndex = rows.findIndex(row => row[0] === ticketNumber);
-
-        if (rowIndex === -1) {
-            console.log('Ticket not found in sheet:', ticketNumber);
-            return;
-        }
-
-        // update status column (column F = index 6)
+        if (rowIndex === -1) return;
         await sheets.spreadsheets.values.update({
             spreadsheetId: process.env.GOOGLE_SHEET_ID,
             range: `Sheet1!F${rowIndex + 1}`,
             valueInputOption: 'USER_ENTERED',
-            resource: {
-                values: [[status]]
-            }
+            resource: { values: [[status]] }
         });
-
         console.log('Ticket status updated in sheet:', ticketNumber, status);
     } catch (err) {
         console.error('Google Sheets update error:', err.message);
