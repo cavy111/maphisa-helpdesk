@@ -24,14 +24,24 @@ router.post('/', async (req, res) => {
         const value = changes?.value;
         const message = value?.messages?.[0];
 
-        if (!message) return res.sendStatus(200);
+        console.log('Entry:', JSON.stringify(entry));
+        console.log('Message:', JSON.stringify(message));
+
+        if (!message) {
+            console.log('No message found in payload');
+            return res.sendStatus(200);
+        }
 
         const from = message.from;
         const text = message.text?.body;
 
-        if (!text) return res.sendStatus(200);
+        console.log('From:', from, 'Text:', text);
 
-        console.log('From:', from, 'Message:', text);
+        if (!text) {
+            console.log('No text body found');
+            return res.sendStatus(200);
+        }
+
         await handleMessage(from, text);
         res.sendStatus(200);
     } catch (err) {
