@@ -15,7 +15,14 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
 });
 
-runMigrations();
+runMigrations().then(() => {
+    app.listen(PORT, () => {
+        console.log(`Helpdesk server running on port ${PORT}`);
+    });
+}).catch(err => {
+    console.error('Migration failed:', err);
+    process.exit(1);
+});
 
 app.listen(PORT, () => {
     console.log(`Helpdesk server running on port ${PORT}`);

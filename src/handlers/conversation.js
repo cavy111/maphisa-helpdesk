@@ -1,4 +1,4 @@
-const db = require('../db/database');
+const pool = require('../db/database');
 const { sendMessage } = require('../services/whatsapp');
 const { createTicket, getTicketByNumber, getTicketsByNumber } = require('../services/tickets');
 const { logTicketToSheet } = require('../services/sheets');
@@ -21,32 +21,26 @@ const DEPARTMENTS = {
     '7': 'Other'
 };
 
-function getState(whatsappNumber) {
-    const state = db.prepare(
-        'SELECT * FROM conversation_state WHERE whatsapp_number = ?'
-    ).get(whatsappNumber);
-
-    if (!state) return { step: 'main_menu', data: {} };
-    return { step: state.step, data: JSON.parse(state.data) };
+async function getState(whatsappNumber) {
+    const result = await pool.query(
+        'SELECT * FROM conversation_state WHERE whatsapp_number = $1',
+        [whatsappNumber]
+    );
+    if (!result.rows[0]) return { step: 'main_menu', data: {} };
+    return { step: result.rows[0].step, data: JSON.parse(result.rows[0].data) };
 }
 
-function setState(whatsappNumber, step, data = {}) {
-    const existing = db.prepare(
-        'SELECT id FROM conversation_state WHERE whatsapp_number = ?'
-    ).get(whatsappNumber);
+async function setState(whatsappNumber, step, data = {}) {
+    await pool.query(`
+        INSERT INTO conversation_state (whatsapp_number, step, data)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (whatsapp_number)
+        DO UPDATE SET step = $2, data = $3, updated_at = CURRENT_TIMESTAMP
+    `, [whatsappNumber, step, JSON.stringify(data)]);
+}
 
-    if (existing) {
-        db.prepare(`
-            UPDATE conversation_state 
-            SET step = ?, data = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE whatsapp_number = ?
-        `).run(step, JSON.stringify(data), whatsappNumber);
-    } else {
-        db.prepare(`
-            INSERT INTO conversation_state (whatsapp_number, step, data)
-            VALUES (?, ?, ?)
-        `).run(whatsappNumber, step, JSON.stringify(data));
-    }
+async function resetState(whatsappNumber) {
+    await setState(whatsappNumber, 'main_menu', {});
 }
 
 function resetState(whatsappNumber) {
@@ -73,7 +67,7 @@ async function notifyICTTeam(ticketData, ticketNumber) {
 
 async function handleMessage(whatsappNumber, message) {
     const input = message.trim().toLowerCase();
-    const { step, data } = getState(whatsappNumber);
+    const { step, data } = await getState(whatsappNumber);
 
     // allow user to restart at any point
     if (input === 'menu' || input === 'hi' || input === 'hello' || input === 'start') {
